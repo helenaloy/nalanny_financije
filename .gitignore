@@ -1,0 +1,10 @@
+node_modules/
+client/node_modules/
+client/build/
+server/uploads/
+server/financije.db
+server/financije.db-journal
+.env
+.DS_Store
+*.log
+
