@@ -4,11 +4,11 @@
   "description": "Aplikacija za vođenje prihoda i rashoda za d.o.o. u Hrvatskoj",
   "main": "server/index.js",
   "scripts": {
-    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "dev": "concurrently \"npm run server\" \"npm run frontend\"",
     "server": "nodemon server/index.js",
-    "client": "cd client && npm start",
-    "install-all": "npm install && cd client && npm install",
-    "build": "cd client && npm run build"
+    "frontend": "cd frontend && npm start",
+    "install-all": "npm install && cd frontend && npm install",
+    "build": "cd frontend && npm run build"
   },
   "keywords": ["financije", "prihodi", "rashodi", "d.o.o."],
   "author": "",
