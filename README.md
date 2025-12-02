@@ -93,3 +93,4 @@ Aplikacija koristi SQLite bazu podataka koja se automatski kreira pri prvom pokr
 - Kategorizacija se temelji na ključnim riječima u opisu transakcije
 - Sve iznose aplikacija prikazuje u HRK (Hrvatska kuna)
 
+# nalanny_financije
