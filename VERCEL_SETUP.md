@@ -98,6 +98,33 @@ Nakon postavljanja, Vercel će:
 3. Pokrenuti build (`npm run build`)
 4. Servirati statičke datoteke iz `frontend/build` foldera
 
+## Važne provjere
+
+### ✅ 1. Homepage u package.json
+**Status**: ✅ DODANO
+- `"homepage": "."` je dodano u `frontend/package.json`
+- Ovo osigurava da se putanje generiraju relativno, što je potrebno za Vercel
+
+### ✅ 2. React Router fallback u vercel.json
+**Status**: ✅ DODANO
+- `rewrites` je dodano u `vercel.json` za client-side routing
+- Sve rute sada vraćaju `index.html`, što omogućava React Router da radi
+
+### ✅ 3. Build komande
+**Status**: ✅ ISPRAVNO
+- Build Command: `cd frontend && npm install && npm run build`
+- Output Directory: `frontend/build`
+- **Ne koristi se** `serve -s build` - Vercel automatski servira statičke datoteke
+
+### ✅ 4. Provjera konzole
+**Za provjeru u pregledniku:**
+1. Otvorite Developer Tools (F12)
+2. Idite na Console tab
+3. Provjerite greške:
+   - 404 za CSS/JS datoteke → provjerite homepage u package.json
+   - React Router greške → provjerite rewrites u vercel.json
+   - Environment varijable → provjerite Vercel Environment Variables
+
 ## Troubleshooting
 
 ### Problem: "react-scripts: command not found"
@@ -108,6 +135,28 @@ Nakon postavljanja, Vercel će:
 
 ### Problem: Build uspije ali stranica ne radi
 **Rješenje**: Provjerite da je Output Directory postavljen na `build` (ne `frontend/build`)
+
+### Problem: Bijela stranica nakon deploymenta
+**Rješenje**: 
+1. Provjerite konzolu u pregledniku (F12 → Console)
+2. Provjerite da je `homepage: "."` u package.json
+3. Provjerite da su rewrites dodani u vercel.json
+
+### Problem: React Router rute ne rade (404)
+**Rješenje**: Provjerite da je `rewrites` dodano u vercel.json:
+```json
+{
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
+```
+
+### Problem: CSS/JS datoteke se ne učitavaju (404)
+**Rješenje**: 
+1. Provjerite da je `homepage: "."` u frontend/package.json
+2. Rebuildajte projekt: `cd frontend && npm run build`
+3. Provjerite da su sve putanje relativne u build folderu
 
 ## Napomene
 
