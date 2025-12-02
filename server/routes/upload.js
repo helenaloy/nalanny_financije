@@ -47,11 +47,20 @@ router.post('/', upload.single('pdf'), async (req, res) => {
     const dataBuffer = fs.readFileSync(req.file.path);
     const pdfData = await pdfParse(dataBuffer);
 
-    // Debug: loguj prvih 1000 znakova PDF teksta za provjeru
-    console.log('=== PDF TEXT SAMPLE (first 1000 chars) ===');
-    console.log(pdfData.text.substring(0, 1000));
-    console.log('=== END PDF TEXT SAMPLE ===');
+    // Debug: loguj detaljne informacije o PDF-u
+    console.log('=== PDF TEXT ANALYSIS ===');
     console.log('Total PDF text length:', pdfData.text.length);
+    console.log('First 2000 chars:', pdfData.text.substring(0, 2000));
+    console.log('Last 1000 chars:', pdfData.text.substring(Math.max(0, pdfData.text.length - 1000)));
+    
+    // Analiziraj strukturu
+    const lines = pdfData.text.split(/\r?\n/);
+    console.log(`Total lines: ${lines.length}`);
+    console.log('First 30 lines:');
+    lines.slice(0, 30).forEach((line, idx) => {
+      console.log(`${idx + 1}: ${line.substring(0, 150)}`);
+    });
+    console.log('=== END PDF TEXT ANALYSIS ===');
 
     // Spremanje informacije o uploadanom izvodu
     const dbInstance = db.getDb();
