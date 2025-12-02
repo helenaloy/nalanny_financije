@@ -72,7 +72,7 @@ router.post('/', async (req, res) => {
   }
 
   // Automatska kategorizacija ako nije navedena
-  const finalCategory = category || await categorizeTransaction(description, amount);
+  const finalCategory = category || await categorizeTransaction(description, amount, type);
 
   const dbInstance = db.getDb();
   dbInstance.run(
@@ -102,7 +102,7 @@ router.put('/:id', async (req, res) => {
   const dbInstance = db.getDb();
 
   // Automatska kategorizacija ako nije navedena
-  const finalCategory = category || await categorizeTransaction(description, amount);
+  const finalCategory = category || await categorizeTransaction(description, amount, type);
 
   dbInstance.run(
     `UPDATE transactions 

@@ -100,16 +100,16 @@ const Transactions = () => {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-        <h1>Transakcije</h1>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+        <h1 style={{ margin: 0, fontSize: '1.5rem' }}>Transakcije</h1>
         <button className="btn btn-primary" onClick={() => setShowForm(true)}>
           + Dodaj transakciju
         </button>
       </div>
 
       {/* Filteri */}
-      <div className="card">
-        <div className="card-header">Filtriraj transakcije</div>
+      <div className="card" style={{ marginBottom: '1rem' }}>
+        <div className="card-header" style={{ marginBottom: '0.5rem' }}>Filtriraj transakcije</div>
         <div className="filter-bar">
           <div className="filter-group">
             <label>Početni datum:</label>
@@ -202,9 +202,9 @@ const Transactions = () => {
             ) : (
               transactions.map((transaction) => (
                 <tr key={transaction.id}>
-                  <td>{format(new Date(transaction.date), 'dd.MM.yyyy')}</td>
-                  <td>{transaction.description}</td>
-                  <td>
+                  <td style={{ whiteSpace: 'nowrap' }}>{format(new Date(transaction.date), 'dd.MM.yyyy')}</td>
+                  <td style={{ maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis' }}>{transaction.description}</td>
+                  <td style={{ whiteSpace: 'nowrap' }}>
                     {transaction.amount.toLocaleString('hr-HR', {
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2,
@@ -220,18 +220,18 @@ const Transactions = () => {
                       {transaction.type === 'prihod' ? 'Prihod' : 'Rashod'}
                     </span>
                   </td>
-                  <td>{transaction.category || '-'}</td>
-                  <td>
+                  <td style={{ whiteSpace: 'nowrap' }}>{transaction.category || '-'}</td>
+                  <td style={{ whiteSpace: 'nowrap' }}>
                     <button
                       className="btn btn-secondary"
-                      style={{ marginRight: '0.5rem', padding: '0.25rem 0.5rem', fontSize: '0.875rem' }}
+                      style={{ marginRight: '0.5rem', padding: '0.2rem 0.4rem', fontSize: '0.8rem' }}
                       onClick={() => handleEdit(transaction)}
                     >
                       Uredi
                     </button>
                     <button
                       className="btn btn-danger"
-                      style={{ padding: '0.25rem 0.5rem', fontSize: '0.875rem' }}
+                      style={{ padding: '0.2rem 0.4rem', fontSize: '0.8rem' }}
                       onClick={() => handleDelete(transaction.id)}
                     >
                       Obriši

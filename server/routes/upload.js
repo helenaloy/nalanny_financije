@@ -47,6 +47,12 @@ router.post('/', upload.single('pdf'), async (req, res) => {
     const dataBuffer = fs.readFileSync(req.file.path);
     const pdfData = await pdfParse(dataBuffer);
 
+    // Debug: loguj prvih 1000 znakova PDF teksta za provjeru
+    console.log('=== PDF TEXT SAMPLE (first 1000 chars) ===');
+    console.log(pdfData.text.substring(0, 1000));
+    console.log('=== END PDF TEXT SAMPLE ===');
+    console.log('Total PDF text length:', pdfData.text.length);
+
     // Spremanje informacije o uploadanom izvodu
     const dbInstance = db.getDb();
     await new Promise((resolve, reject) => {
@@ -66,12 +72,71 @@ router.post('/', upload.single('pdf'), async (req, res) => {
 
     // Parsiranje transakcija iz PDF-a
     const transactions = parseBankStatement(pdfData.text);
+    
+    console.log('=== PARSING RESULTS ===');
+    console.log('Found transactions:', transactions.length);
+    if (transactions.length === 0) {
+      console.log('WARNING: No transactions found!');
+      // Loguj prvih 50 redaka PDF teksta za debug
+      const lines = pdfData.text.split('\n').slice(0, 50);
+      console.log('First 50 lines of PDF:');
+      lines.forEach((line, idx) => {
+        console.log(`${idx + 1}: ${line.substring(0, 100)}`);
+      });
+    }
 
-    // Kategorizacija i spremanje transakcija
-    const savedTransactions = [];
+    // Debug: loguj prve nekoliko transakcija za provjeru
+    console.log('Parsirane transakcije (prvih 5):');
+    transactions.slice(0, 5).forEach((t, idx) => {
+      console.log(`${idx + 1}. ${t.date} - ${t.description.substring(0, 50)}... - Original: ${t.originalAmountStr || t.originalAmount}, Parsed: ${t.amount}`);
+    });
+
+    // Kategorizacija transakcija (bez spremanja)
+    const previewTransactions = [];
     for (const transaction of transactions) {
-      const category = await categorizeTransaction(transaction.description, transaction.amount);
-      
+      const category = await categorizeTransaction(
+        transaction.description,
+        transaction.amount,
+        transaction.type
+      );
+      previewTransactions.push({
+        ...transaction,
+        category,
+        // Dodajemo temp ID za frontend
+        tempId: `temp-${Date.now()}-${Math.random()}`
+      });
+    }
+
+    // Vraćamo transakcije za pregled i potvrdu
+    res.json({
+      message: 'Bankovni izvod uspješno parsiran',
+      transactionsCount: previewTransactions.length,
+      transactions: previewTransactions,
+      filename: req.file.filename,
+      // Ne spremamo odmah - čekamo potvrdu korisnika
+      pending: true
+    });
+
+  } catch (error) {
+    console.error('Error processing PDF:', error);
+    res.status(500).json({ error: 'Greška pri obradi PDF datoteke: ' + error.message });
+  }
+});
+
+// POST /api/upload/confirm - Potvrda i spremanje transakcija
+router.post('/confirm', async (req, res) => {
+  try {
+    const { transactions, filename } = req.body;
+
+    if (!transactions || !Array.isArray(transactions) || transactions.length === 0) {
+      return res.status(400).json({ error: 'Nema transakcija za spremanje' });
+    }
+
+    const dbInstance = db.getDb();
+    const savedTransactions = [];
+
+    // Spremi sve transakcije
+    for (const transaction of transactions) {
       await new Promise((resolve, reject) => {
         dbInstance.run(
           `INSERT INTO transactions (date, description, amount, type, category, bank_reference)
@@ -81,7 +146,7 @@ router.post('/', upload.single('pdf'), async (req, res) => {
             transaction.description,
             transaction.amount,
             transaction.type,
-            category,
+            transaction.category,
             transaction.reference || null
           ],
           function(err) {
@@ -91,8 +156,7 @@ router.post('/', upload.single('pdf'), async (req, res) => {
             } else {
               savedTransactions.push({
                 id: this.lastID,
-                ...transaction,
-                category
+                ...transaction
               });
               resolve();
             }
@@ -101,31 +165,32 @@ router.post('/', upload.single('pdf'), async (req, res) => {
       });
     }
 
-    // Označi izvod kao obrađen
-    await new Promise((resolve, reject) => {
-      dbInstance.run(
-        'UPDATE bank_statements SET processed = 1 WHERE filename = ?',
-        [req.file.filename],
-        function(err) {
-          if (err) {
-            console.error('Error updating bank statement:', err);
-            reject(err);
-          } else {
+    // Označi izvod kao obrađen ako je filename naveden
+    if (filename) {
+      await new Promise((resolve, reject) => {
+        dbInstance.run(
+          'UPDATE bank_statements SET processed = 1 WHERE filename = ?',
+          [filename],
+          function(err) {
+            if (err) {
+              console.error('Error updating bank statement:', err);
+              // Ne odbijamo ako ovo ne uspije
+            }
             resolve();
           }
-        }
-      );
-    });
+        );
+      });
+    }
 
     res.json({
-      message: 'Bankovni izvod uspješno obrađen',
+      message: 'Transakcije uspješno spremljene',
       transactionsCount: savedTransactions.length,
       transactions: savedTransactions
     });
 
   } catch (error) {
-    console.error('Error processing PDF:', error);
-    res.status(500).json({ error: 'Greška pri obradi PDF datoteke: ' + error.message });
+    console.error('Error confirming transactions:', error);
+    res.status(500).json({ error: 'Greška pri spremanju transakcija: ' + error.message });
   }
 });
 
