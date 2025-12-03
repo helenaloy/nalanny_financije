@@ -15,26 +15,33 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Serve static files from React app
-app.use(express.static(path.join(__dirname, '../client/build')));
-
 // API Routes
 app.use('/api/upload', uploadRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/travel-orders', travelOrderRoutes);
 
-// Catch all handler: send back React's index.html file
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '../client/build/index.html'));
-});
-
-// Initialize database
-db.init().then(() => {
-  app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+// Serve static files from React app (samo za lokalno)
+if (process.env.NODE_ENV !== 'production') {
+  app.use(express.static(path.join(__dirname, '../frontend/build')));
+  
+  // Catch all handler: send back React's index.html file
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, '../frontend/build/index.html'));
   });
-});
+}
+
+// Initialize database i export app
+if (process.env.NODE_ENV !== 'production') {
+  db.init().then(() => {
+    app.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
+    });
+  });
+} else {
+  // Za Vercel, samo inicijaliziraj bazu
+  db.init().catch(err => console.error('DB init error:', err));
+}
 
 module.exports = app;
 
