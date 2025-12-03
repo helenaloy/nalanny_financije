@@ -16,6 +16,9 @@ const Transactions = () => {
     search: '',
   });
   const [categories, setCategories] = useState([]);
+  const [showDeleteYearModal, setShowDeleteYearModal] = useState(false);
+  const [deleteYear, setDeleteYear] = useState(new Date().getFullYear());
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     fetchCategories();
@@ -94,6 +97,30 @@ const Transactions = () => {
     return categories.filter((cat) => !type || cat.type === type);
   };
 
+  const handleDeleteByYear = async () => {
+    if (!deleteYear || deleteYear < 2000 || deleteYear > 2100) {
+      alert('Molimo unesite valjanu godinu');
+      return;
+    }
+
+    const confirmMessage = `Jeste li SIGURNI da želite obrisati SVE transakcije iz ${deleteYear}. godine?\n\nOvo će trajno obrisati sve transakcije i ne može se poništiti!`;
+    
+    if (window.confirm(confirmMessage)) {
+      try {
+        setDeleting(true);
+        const response = await axios.delete(`/api/transactions/year/${deleteYear}`);
+        alert(response.data.message || `Uspješno obrisano ${response.data.deletedCount} transakcija iz ${deleteYear}. godine`);
+        setShowDeleteYearModal(false);
+        fetchTransactions();
+      } catch (error) {
+        console.error('Error deleting transactions:', error);
+        alert(error.response?.data?.error || 'Greška pri brisanju transakcija');
+      } finally {
+        setDeleting(false);
+      }
+    }
+  };
+
   if (loading) {
     return <div className="loading">Učitavanje...</div>;
   }
@@ -102,9 +129,18 @@ const Transactions = () => {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
         <h1 style={{ margin: 0, fontSize: '1.5rem' }}>Transakcije</h1>
-        <button className="btn btn-primary" onClick={() => setShowForm(true)}>
-          + Dodaj transakciju
-        </button>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <button 
+            className="btn btn-danger" 
+            onClick={() => setShowDeleteYearModal(true)}
+            style={{ fontSize: '0.875rem' }}
+          >
+            Obriši po godini
+          </button>
+          <button className="btn btn-primary" onClick={() => setShowForm(true)}>
+            + Dodaj transakciju
+          </button>
+        </div>
       </div>
 
       {/* Filteri */}
@@ -205,11 +241,11 @@ const Transactions = () => {
                   <td style={{ whiteSpace: 'nowrap' }}>{format(new Date(transaction.date), 'dd.MM.yyyy')}</td>
                   <td style={{ maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis' }}>{transaction.description}</td>
                   <td style={{ whiteSpace: 'nowrap' }}>
-                    {transaction.amount.toLocaleString('hr-HR', {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}{' '}
-                    HRK
+                      {transaction.amount.toLocaleString('hr-HR', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}{' '}
+                      EUR
                   </td>
                   <td>
                     <span
@@ -251,6 +287,58 @@ const Transactions = () => {
           categories={categories}
           onClose={handleFormClose}
         />
+      )}
+
+      {/* Modal za brisanje po godini */}
+      {showDeleteYearModal && (
+        <div className="modal-overlay" onClick={() => !deleting && setShowDeleteYearModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Obriši sve transakcije po godini</h2>
+              <button 
+                className="modal-close" 
+                onClick={() => setShowDeleteYearModal(false)}
+                disabled={deleting}
+              >
+                ×
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="alert alert-warning" style={{ marginBottom: '1rem' }}>
+                <strong>Upozorenje:</strong> Ova akcija će trajno obrisati sve transakcije iz odabrane godine i ne može se poništiti!
+              </div>
+              <div className="form-group">
+                <label>Odaberite godinu:</label>
+                <select
+                  className="form-control"
+                  value={deleteYear}
+                  onChange={(e) => setDeleteYear(parseInt(e.target.value))}
+                  disabled={deleting}
+                >
+                  {Array.from({ length: 11 }, (_, i) => new Date().getFullYear() - 5 + i).map(year => (
+                    <option key={year} value={year}>{year}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button
+                className="btn btn-secondary"
+                onClick={() => setShowDeleteYearModal(false)}
+                disabled={deleting}
+              >
+                Odustani
+              </button>
+              <button
+                className="btn btn-danger"
+                onClick={handleDeleteByYear}
+                disabled={deleting}
+              >
+                {deleting ? 'Brisanje...' : `Obriši sve iz ${deleteYear}. godine`}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

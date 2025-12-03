@@ -5,6 +5,7 @@ const db = require('./database');
 const uploadRoutes = require('./routes/upload');
 const transactionRoutes = require('./routes/transactions');
 const reportRoutes = require('./routes/reports');
+const travelOrderRoutes = require('./routes/travelOrders');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -21,6 +22,7 @@ app.use(express.static(path.join(__dirname, '../client/build')));
 app.use('/api/upload', uploadRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/travel-orders', travelOrderRoutes);
 
 // Catch all handler: send back React's index.html file
 app.get('*', (req, res) => {

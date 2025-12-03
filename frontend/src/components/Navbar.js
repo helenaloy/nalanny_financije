@@ -26,6 +26,12 @@ const Navbar = () => {
             Uvoz PDF
           </Link>
           <Link
+            to="/travel-orders"
+            className={location.pathname === '/travel-orders' ? 'active' : ''}
+          >
+            Putni nalozi
+          </Link>
+          <Link
             to="/reports"
             className={location.pathname === '/reports' ? 'active' : ''}
           >

@@ -64,6 +64,15 @@ const Upload = () => {
     });
   };
 
+  const handleDelete = (index) => {
+    const updated = [...previewTransactions.transactions];
+    updated.splice(index, 1);
+    setPreviewTransactions({
+      ...previewTransactions,
+      transactions: updated
+    });
+  };
+
   const handleConfirm = async () => {
     try {
       setSaving(true);
@@ -139,7 +148,8 @@ const Upload = () => {
           </div>
           <div className="alert alert-info">
             <strong>Važno:</strong> Provjerite je li tip transakcije (prihod/rashod) točan
-            prije spremanja. Možete promijeniti tip klikom na padajući izbornik.
+            prije spremanja. Možete promijeniti tip klikom na padajući izbornik ili obrisati
+            transakcije koje ne želite spremiti.
           </div>
 
           <div style={{ maxHeight: '500px', overflowY: 'auto', marginBottom: '1rem' }}>
@@ -150,46 +160,66 @@ const Upload = () => {
                   <th>Opis</th>
                   <th>Iznos</th>
                   <th>Tip</th>
-                  <th>Kategorija</th>
+                  <th>Akcije</th>
                 </tr>
               </thead>
               <tbody>
-                {previewTransactions.transactions.map((transaction, index) => (
-                  <tr key={transaction.tempId || index}>
-                    <td>{format(new Date(transaction.date), 'dd.MM.yyyy')}</td>
-                    <td style={{ maxWidth: '300px', wordWrap: 'break-word' }}>
-                      {transaction.description}
+                {previewTransactions.transactions.length === 0 ? (
+                  <tr>
+                    <td colSpan="5" style={{ textAlign: 'center', padding: '2rem' }}>
+                      Nema transakcija za prikaz
                     </td>
-                    <td style={{ whiteSpace: 'nowrap' }}>
-                      {transaction.amount.toLocaleString('hr-HR', {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}{' '}
-                      HRK
-                      {transaction.originalAmountStr && (
-                        <span style={{ fontSize: '0.75rem', color: '#666', marginLeft: '0.5rem', display: 'block' }}>
-                          (iz PDF: {transaction.originalAmountStr})
-                        </span>
-                      )}
-                    </td>
-                    <td>
-                      <select
-                        value={transaction.type}
-                        onChange={(e) => handleTypeChange(index, e.target.value)}
-                        className="form-control"
-                        style={{
-                          minWidth: '120px',
-                          padding: '0.25rem 0.5rem',
-                          fontSize: '0.875rem',
-                        }}
-                      >
-                        <option value="prihod">Prihod</option>
-                        <option value="rashod">Rashod</option>
-                      </select>
-                    </td>
-                    <td>{transaction.category || '-'}</td>
                   </tr>
-                ))}
+                ) : (
+                  previewTransactions.transactions.map((transaction, index) => (
+                    <tr key={transaction.tempId || index}>
+                      <td>{format(new Date(transaction.date), 'dd.MM.yyyy')}</td>
+                      <td style={{ maxWidth: '300px', wordWrap: 'break-word' }}>
+                        {transaction.description}
+                      </td>
+                      <td style={{ whiteSpace: 'nowrap' }}>
+                        {transaction.amount.toLocaleString('hr-HR', {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}{' '}
+                        EUR
+                        {transaction.originalAmountStr && (
+                          <span style={{ fontSize: '0.75rem', color: '#666', marginLeft: '0.5rem', display: 'block' }}>
+                            (iz PDF: {transaction.originalAmountStr})
+                          </span>
+                        )}
+                      </td>
+                      <td>
+                        <select
+                          value={transaction.type}
+                          onChange={(e) => handleTypeChange(index, e.target.value)}
+                          className="form-control"
+                          style={{
+                            minWidth: '120px',
+                            padding: '0.25rem 0.5rem',
+                            fontSize: '0.875rem',
+                          }}
+                        >
+                          <option value="prihod">Prihod</option>
+                          <option value="rashod">Rashod</option>
+                        </select>
+                      </td>
+                      <td>
+                        <button
+                          className="btn btn-danger"
+                          onClick={() => handleDelete(index)}
+                          style={{
+                            padding: '0.2rem 0.4rem',
+                            fontSize: '0.8rem',
+                          }}
+                          title="Obriši transakciju"
+                        >
+                          Obriši
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -205,7 +235,7 @@ const Upload = () => {
             <button
               className="btn btn-primary"
               onClick={handleConfirm}
-              disabled={saving}
+              disabled={saving || previewTransactions.transactions.length === 0}
             >
               {saving ? 'Spremanje...' : `Potvrdi i spremi ${previewTransactions.transactions.length} transakcija`}
             </button>
@@ -228,6 +258,9 @@ const Upload = () => {
           </li>
           <li>
             Možete promijeniti tip transakcije prije potvrde i spremanja
+          </li>
+          <li>
+            Možete obrisati transakcije koje ne želite spremiti klikom na gumb "Obriši"
           </li>
           <li>
             <strong>Napomena:</strong> Format PDF-a mora biti kompatibilan s

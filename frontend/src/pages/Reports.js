@@ -221,14 +221,14 @@ const Reports = () => {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
                   })}{' '}
-                  HRK
+                  EUR
                 </td>
                 <td className="stat-card-value negative">
                   {year.totalRashodi.toLocaleString('hr-HR', {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
                   })}{' '}
-                  HRK
+                  EUR
                 </td>
                 <td
                   className={`stat-card-value ${
@@ -239,7 +239,7 @@ const Reports = () => {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
                   })}{' '}
-                  HRK
+                  EUR
                 </td>
               </tr>
             ))}
@@ -284,7 +284,7 @@ const Reports = () => {
                           minimumFractionDigits: 2,
                           maximumFractionDigits: 2,
                         })}{' '}
-                        HRK
+                        EUR
                       </td>
                     </tr>
                   ))}
@@ -309,7 +309,7 @@ const Reports = () => {
                           minimumFractionDigits: 2,
                           maximumFractionDigits: 2,
                         })}{' '}
-                        HRK
+                        EUR
                       </td>
                     </tr>
                   ))}

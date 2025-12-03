@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard';
 import Transactions from './pages/Transactions';
 import Upload from './pages/Upload';
 import Reports from './pages/Reports';
+import TravelOrders from './pages/TravelOrders';
 
 function App() {
   return (
@@ -18,6 +19,7 @@ function App() {
             <Route path="/transactions" element={<Transactions />} />
             <Route path="/upload" element={<Upload />} />
             <Route path="/reports" element={<Reports />} />
+            <Route path="/travel-orders" element={<TravelOrders />} />
           </Routes>
         </div>
       </div>

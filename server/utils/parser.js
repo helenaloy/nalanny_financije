@@ -2,8 +2,8 @@ const { format, parse, isValid } = require('date-fns');
 const { hr } = require('date-fns/locale');
 const db = require('../database');
 
-// Parsiranje bankovnog izvoda iz PDF teksta
-// Pojednostavljena i robustnija verzija
+// Parsiranje bankovnog izvoda Privredne banke Zagreb
+// Struktura: RBR → HR račun → Naziv → Adresa → Opis → Datumi → Iznos
 const parseBankStatement = (pdfText) => {
   const transactions = [];
   
@@ -12,282 +12,348 @@ const parseBankStatement = (pdfText) => {
     return transactions;
   }
 
-  console.log('=== PARSING PDF ===');
+  console.log('=== PARSING PDF - PBZ FORMAT ===');
   console.log('PDF text length:', pdfText.length);
-  console.log('First 2000 chars:', pdfText.substring(0, 2000));
-  console.log('Last 500 chars:', pdfText.substring(Math.max(0, pdfText.length - 500)));
 
-  // Zadržaj originalni format
+  // Split po redovima
   const lines = pdfText.split(/\r?\n/).map(line => line.trim()).filter(line => line.length > 0);
   console.log(`Total lines in PDF: ${lines.length}`);
 
-  // Pattern za datum u formatu DD.MM.YYYY
-  const datePattern = /(\d{1,2}\.\d{1,2}\.\d{4})/g;
-  
-  // Pattern za iznose u hrvatskom formatu (npr. 2.500,00 ili 16,85)
-  const amountPattern = /(\d{1,3}(?:\.\d{3})*,\d{2}|\d+,\d{2})/g;
+  // Pattern za prepoznavanje strukturnih elemenata
+  const rbrPattern = /^(\d+)\.HR\d+/; // RBR s HR računom (npr. "1.HR1210010051863000160")
+  const datePattern = /(\d{2}\.\d{2}\.\d{4})/g;
+  const amountPattern = /^(\d{1,3}(?:\.\d{3})*,\d{2})$/; // Iznos na kraju u posebnom retku
 
-  // Pronađi sve retke koji sadrže i datum i iznos
-  const candidateLines = [];
+  // Pronađi header s kolonama Isplata/Uplata
+  let isplataColumnIndex = -1;
+  let uplataColumnIndex = -1;
   
+  for (let i = 0; i < Math.min(30, lines.length); i++) {
+    const line = lines[i].toLowerCase();
+    if (line.includes('isplata') || line.includes('duguje')) {
+      isplataColumnIndex = i;
+      console.log(`Found "Isplata" header at line ${i + 1}`);
+    }
+    if (line.includes('uplata') || line.includes('potražuje')) {
+      uplataColumnIndex = i;
+      console.log(`Found "Uplata" header at line ${i + 1}`);
+    }
+  }
+
+  // Pronađi početak transakcija - nakon header sekcije
+  let startIndex = -1;
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    if (!line || line.length < 5) continue;
-
-    // Preskoči očito ne-transakcije
-    const lineLower = line.toLowerCase();
-    if (lineLower.includes('izvadak') || 
-        lineLower.includes('stanje prethodnog') ||
-        lineLower.includes('ukupni') ||
-        lineLower.includes('novo stanje') ||
-        lineLower.includes('kraj') && lineLower.includes('izvatka')) {
-      continue;
-    }
-
-    const dates = [...line.matchAll(datePattern)].map(m => m[1]);
-    const amounts = [...line.matchAll(amountPattern)].map(m => m[1]);
-
-    if (dates.length > 0 && amounts.length > 0) {
-      candidateLines.push({
-        lineIndex: i,
-        line: line,
-        dates: dates,
-        amounts: amounts
-      });
-      console.log(`Candidate line ${i + 1}: ${line.substring(0, 150)}`);
+    if (rbrPattern.test(line)) {
+      startIndex = i;
+      console.log(`Found first transaction at line ${i + 1}: ${line}`);
+      break;
     }
   }
 
-  console.log(`Found ${candidateLines.length} candidate lines with dates and amounts`);
-
-  if (candidateLines.length === 0) {
-    console.log('❌ No candidate lines found - trying alternative parsing');
-    return parseAlternative(lines, datePattern, amountPattern);
+  if (startIndex === -1) {
+    console.log('❌ No transactions found - RBR pattern not matched');
+    return transactions;
   }
 
-  // Parsiraj svaku kandidat liniju
-  for (const candidate of candidateLines) {
-    const { lineIndex, line, dates, amounts } = candidate;
-    
-    // Koristi prvi datum
-    const valueDate = dates[0];
-    
-    // Pronađi opis - pokušaj u retku i okolnim redovima
-    let description = findDescription(line, lineIndex, lines, valueDate);
-    
-    // Za svaki iznos, kreiraj transakciju
-    for (const amount of amounts) {
-      const amountValue = parseAmountString(amount);
-      
-      // Odredi tip - provjeri kontekst retka
-      let type = determineTypeFromContext(line, amount, amountValue, candidateLines);
-      
-      transactions.push({
-        date: formatDate(valueDate),
-        description: description,
-        amount: amountValue,
-        originalAmountStr: amount,
-        type: type,
-        reference: null
-      });
-      
-      console.log(`✅ Transaction: ${valueDate} - ${description.substring(0, 50)} - ${amount} (${type})`);
+  // Parsiraj transakcije po blokovima
+  let i = startIndex;
+  let transactionCount = 0;
+
+  while (i < lines.length) {
+    const line = lines[i];
+
+    // Provjeri je li kraj izvoda
+    if (line.includes('KRAJ') && line.includes('IZVATKA')) {
+      console.log(`End of statement at line ${i + 1}`);
+      break;
     }
+
+    // Provjeri je li ovo početak transakcije (RBR.HR...)
+    const rbrMatch = line.match(rbrPattern);
+    if (rbrMatch) {
+      transactionCount++;
+      console.log(`\n--- Transaction ${transactionCount} starts at line ${i + 1} ---`);
+      console.log(`Line: ${line}`);
+
+      // Ekstraktiraj HR račun iz prvog retka
+      const hrAccountMatch = line.match(/(HR\d{19,})/);
+      const hrAccount = hrAccountMatch ? hrAccountMatch[1] : '';
+      
+      // Provjeri je li HR račun tvoj (NALANNY) ili tuđi
+      const isOwnAccount = hrAccount.includes('2340009111129788'); // Tvoj račun iz PDF-a
+      
+      let currentLine = i;
+      let name = '';
+      let address = '';
+      let description = '';
+      let dates = [];
+      let amount = '';
+      let allLinesInTransaction = [];
+
+      // Prikupi podatke za ovu transakciju (sljedećih 15-20 redaka)
+      for (let j = 1; j < 20 && currentLine + j < lines.length; j++) {
+        const nextLine = lines[currentLine + j];
+        allLinesInTransaction.push(nextLine);
+        
+        // Provjeri je li sljedeća transakcija ili kraj
+        if (rbrPattern.test(nextLine) || (nextLine.includes('KRAJ') && nextLine.includes('IZVATKA'))) {
+          console.log(`Next transaction or end detected at line ${currentLine + j + 1}`);
+          i = currentLine + j - 1;
+          break;
+        }
+
+        // Preskoči separator linije
+        if (nextLine.startsWith('___') || nextLine.startsWith('---')) {
+          console.log(`Separator at line ${currentLine + j + 1}`);
+          i = currentLine + j;
+          break;
+        }
+
+        // Ekstraktiraj naziv (prvi red nakon HR računa koji nije HR račun/referenca)
+        if (!name && nextLine.length > 5 && 
+            !nextLine.startsWith('HR') && 
+            !/^\d+$/.test(nextLine) &&
+            !nextLine.match(/^\d{2}\.\d{2}\.\d{4}$/) &&
+            !amountPattern.test(nextLine) &&
+            !nextLine.includes('HRVATSKA') &&
+            !/^\d{10,}$/.test(nextLine)) {
+          name = nextLine;
+          console.log(`Name: ${name}`);
+          continue;
+        }
+
+        // Ekstraktiraj adresu (redovi nakon naziva, prije opisa)
+        if (name && !description && nextLine.length > 5 &&
+            !nextLine.startsWith('HR') &&
+            !/^\d{10,}$/.test(nextLine) &&
+            !nextLine.match(/^\d{2}\.\d{2}\.\d{4}$/) &&
+            !amountPattern.test(nextLine) &&
+            (nextLine.toLowerCase().includes('ulica') || 
+             nextLine.toLowerCase().includes('cesta') ||
+             nextLine.match(/\d{5}/) || // Poštanski broj
+             nextLine === 'HRVATSKA' ||
+             nextLine.toLowerCase().includes('zagreb'))) {
+          if (address) address += ' ';
+          address += nextLine;
+          console.log(`Address: ${nextLine}`);
+          continue;
+        }
+
+        // Ekstraktiraj opis (redak prije datuma, sadrži slova)
+        if (name && !description && nextLine.length > 5 &&
+            !nextLine.startsWith('HR') &&
+            !/^\d{10,}$/.test(nextLine) &&
+            !nextLine.match(/^\d{2}\.\d{2}\.\d{4}$/) &&
+            !amountPattern.test(nextLine) &&
+            !nextLine.includes('HRVATSKA') &&
+            /[A-Za-z]{5,}/.test(nextLine)) {
+          description = nextLine;
+          console.log(`Description: ${description}`);
+          continue;
+        }
+
+        // Ekstraktiraj datume
+        const foundDates = [...nextLine.matchAll(datePattern)].map(m => m[1]);
+        if (foundDates.length > 0 && dates.length === 0) {
+          dates = foundDates;
+          console.log(`Dates: ${dates.join(', ')}`);
+          continue;
+        }
+
+        // Ekstraktiraj iznos (cijeli redak mora biti iznos)
+        if (amountPattern.test(nextLine)) {
+          amount = nextLine;
+          console.log(`Amount: ${amount}`);
+          i = currentLine + j;
+          break;
+        }
+      }
+
+      // Kreiraj transakciju ako ima sve potrebne podatke
+      if (dates.length > 0 && amount && (name || description)) {
+        const fullDescription = name ? 
+          (description ? `${name} - ${description}` : name) : 
+          description;
+
+        // POBOLJŠANA LOGIKA ZA ODREĐIVANJE TIPA (prihod/rashod)
+        let type = determineTransactionType(
+          fullDescription, 
+          name, 
+          description, 
+          hrAccount, 
+          isOwnAccount,
+          parseAmountString(amount),
+          allLinesInTransaction
+        );
+
+        const transaction = {
+          date: formatDate(dates[0]),
+          description: fullDescription.substring(0, 500),
+          amount: parseAmountString(amount),
+          originalAmountStr: amount,
+          type: type,
+          reference: hrAccount || null
+        };
+
+        transactions.push(transaction);
+        console.log(`✅ Transaction added: ${transaction.date} - ${transaction.description.substring(0, 50)} - ${amount} (${type})`);
+      } else {
+        console.log(`⚠️ Incomplete transaction - dates:${dates.length}, amount:${amount?'yes':'no'}, desc:${name||description?'yes':'no'}`);
+      }
+    }
+
+    i++;
   }
 
-  console.log(`✅ Total transactions parsed: ${transactions.length}`);
+  console.log(`\n✅ Total transactions parsed: ${transactions.length}`);
   return transactions;
 };
 
-// Alternativno parsiranje - traži bilo koji datum i iznos u blizini
-function parseAlternative(lines, datePattern, amountPattern) {
-  const transactions = [];
+// POBOLJŠANA FUNKCIJA ZA ODREĐIVANJE TIPA TRANSAKCIJE
+function determineTransactionType(fullDescription, name, description, hrAccount, isOwnAccount, amount, allLines) {
+  const descLower = fullDescription.toLowerCase();
+  const nameLower = (name || '').toLowerCase();
+  const descriptionLower = (description || '').toLowerCase();
   
-  console.log('Trying alternative parsing method...');
+  console.log(`Determining type for: "${fullDescription.substring(0, 60)}"`);
+  console.log(`  - Name: "${name}"`);
+  console.log(`  - Description: "${description}"`);
+  console.log(`  - HR Account: ${hrAccount}`);
+  console.log(`  - Is Own Account: ${isOwnAccount}`);
+  console.log(`  - Amount: ${amount}`);
   
-  // Pronađi sve datume i iznose u dokumentu
-  const allDates = [];
-  const allAmounts = [];
+  // ===================================================================
+  // PRIORITET 1: SPECIFIČNI SLUČAJEVI - NAJVEĆI PRIORITET
+  // ===================================================================
   
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    if (!line || line.length < 5) continue;
-
-    const dates = [...line.matchAll(datePattern)].map(m => ({ date: m[1], lineIndex: i, line: line }));
-    const amounts = [...line.matchAll(amountPattern)].map(m => ({ amount: m[1], lineIndex: i, line: line }));
-    
-    allDates.push(...dates);
-    allAmounts.push(...amounts);
-  }
-
-  console.log(`Found ${allDates.length} dates and ${allAmounts.length} amounts`);
-
-  // Poveži datume i iznose koji su blizu (unutar 10 redaka)
-  for (const dateInfo of allDates) {
-    const nearbyAmounts = allAmounts.filter(a => 
-      Math.abs(a.lineIndex - dateInfo.lineIndex) <= 10
-    );
-
-    if (nearbyAmounts.length > 0) {
-      // Pronađi opis u blizini
-      let description = '';
-      const startLine = Math.max(0, dateInfo.lineIndex - 5);
-      const endLine = Math.min(lines.length - 1, dateInfo.lineIndex + 5);
-      
-      for (let i = startLine; i <= endLine; i++) {
-        const line = lines[i];
-        if (!line || line.length < 10) continue;
-        
-        // Provjeri je li ovo opis (sadrži slova, nije datum, nije iznos)
-        if (!datePattern.test(line) && 
-            !amountPattern.test(line) &&
-            !line.toLowerCase().includes('rbr') &&
-            !line.toLowerCase().includes('račun') &&
-            !line.toLowerCase().includes('referenca') &&
-            !line.toLowerCase().includes('datum') &&
-            !line.toLowerCase().includes('zagreb') && // Preskoči adrese
-            !line.toLowerCase().includes('hrvatska') &&
-            /[A-Za-z]{4,}/.test(line) &&
-            line.length < 200) {
-          description = line.trim();
-          break;
-        }
-      }
-
-      if (!description) {
-        description = 'Transakcija';
-      }
-
-      // Kreiraj transakciju za svaki iznos u blizini
-      for (const amountInfo of nearbyAmounts) {
-        const amountValue = parseAmountString(amountInfo.amount);
-        const type = amountValue > 100 ? 'prihod' : 'rashod';
-        
-        transactions.push({
-          date: formatDate(dateInfo.date),
-          description: description,
-          amount: amountValue,
-          originalAmountStr: amountInfo.amount,
-          type: type,
-          reference: null
-        });
-      }
-    }
-  }
-
-  // Ukloni duplikate
-  const unique = [];
-  const seen = new Set();
-  
-  transactions.forEach(t => {
-    const key = `${t.date}-${t.amount}-${t.type}`;
-    if (!seen.has(key)) {
-      seen.add(key);
-      unique.push(t);
-    }
-  });
-
-  console.log(`✅ Alternative method found ${unique.length} unique transactions`);
-  return unique;
-}
-
-// Pronađi opis transakcije
-function findDescription(line, lineIndex, allLines, valueDate) {
-  let description = '';
-  
-  // Pokušaj pronaći opis u retku (dio prije datuma)
-  const dateIndex = line.indexOf(valueDate);
-  if (dateIndex > 0) {
-    const beforeDate = line.substring(0, dateIndex).trim();
-    
-    // Ukloni HR brojeve, reference, brojeve
-    const textParts = beforeDate.split(/\s+/).filter(part => {
-      return !/^HR\d+$/.test(part) && 
-             !/^\d{10,}$/.test(part) && 
-             !/^[A-Z]{2}\d+/.test(part) &&
-             part.length > 2 &&
-             !/^\d+$/.test(part) &&
-             !/^\d+\.\d+\.\d+$/.test(part) &&
-             !part.toLowerCase().includes('zagreb') &&
-             !part.toLowerCase().includes('hrvatska');
-    });
-    
-    if (textParts.length > 0) {
-      description = textParts.join(' ');
-    }
-  }
-  
-  // Ako nema opisa, pokušaj u prethodnim redovima
-  if (!description || description.length < 5) {
-    for (let j = Math.max(0, lineIndex - 10); j < lineIndex; j++) {
-      if (j < 0 || j >= allLines.length) continue;
-      
-      const prevLine = allLines[j];
-      if (!prevLine || prevLine.length < 10) continue;
-      
-      // Preskoči očito ne-opise
-      if (datePattern.test(prevLine) || 
-          amountPattern.test(prevLine) ||
-          prevLine.toLowerCase().includes('rbr') ||
-          prevLine.toLowerCase().includes('račun') ||
-          prevLine.toLowerCase().includes('naziv') ||
-          prevLine.toLowerCase().includes('referenca') ||
-          prevLine.toLowerCase().includes('datum') ||
-          prevLine.toLowerCase().includes('isplata') ||
-          prevLine.toLowerCase().includes('uplata')) {
-        continue;
-      }
-      
-      // Provjeri je li ovo opis (sadrži slova)
-      if (/[A-Za-z]{4,}/.test(prevLine) && prevLine.length < 300) {
-        // Provjeri nije li to samo adresa
-        if (!prevLine.match(/^\d+/) && // Ne počinje s brojem
-            !prevLine.toLowerCase().includes('ulica') &&
-            !prevLine.toLowerCase().includes('zagreb') &&
-            !prevLine.toLowerCase().includes('hrvatska')) {
-          description = prevLine.trim();
-          break;
-        }
-      }
-    }
-  }
-  
-  if (!description || description.length < 3) {
-    description = 'Transakcija';
-  }
-  
-  return description;
-}
-
-// Odredi tip transakcije iz konteksta
-function determineTypeFromContext(line, amount, amountValue, allCandidates) {
-  const lineLower = line.toLowerCase();
-  
-  // Provjeri eksplicitne oznake u retku
-  if (lineLower.includes('isplata') || lineLower.includes('duguje')) {
-    return 'rashod';
-  }
-  if (lineLower.includes('uplata') || lineLower.includes('potražuje')) {
+  // 1a. PRIJENOS TEMELJNOG KAPITALA - uvijek prihod (osnivanje firme)
+  if (descLower.includes('prijenos temeljnog kapitala') || 
+      descLower.includes('temeljni kapital') ||
+      descLower.includes('osnivanje')) {
+    console.log('→ Type: PRIHOD (founding capital)');
     return 'prihod';
   }
   
-  // Heuristika: veći iznosi su obično prihodi
-  if (amountValue > 500) {
+  // 1b. UPLATA/AVANS OD KLIJENATA - uvijek prihod
+  if ((descriptionLower.includes('uplata') || descriptionLower.includes('avans')) &&
+      (descriptionLower.includes('ponud') || descriptionLower.includes('faktur') || descriptionLower.includes('račun'))) {
+    console.log('→ Type: PRIHOD (payment from client)');
     return 'prihod';
   }
-  if (amountValue < 50) {
+  
+  // 1c. PLAĆANJE/TRANSFER OD DRUGOG LICA (ne banka, ne država) - prihod
+  if (!nameLower.includes('banka') && 
+      !nameLower.includes('ministarstvo') && 
+      !nameLower.includes('porezna') &&
+      !nameLower.includes('republika') &&
+      name && name.length > 10) {
+    console.log('→ Type: PRIHOD (payment from person/company)');
+    return 'prihod';
+  }
+  
+  // ===================================================================
+  // PRIORITET 2: BANKOVNE TRANSAKCIJE
+  // ===================================================================
+  
+  if (nameLower.includes('privredna banka') || nameLower.includes('pbz') || nameLower.includes('banka')) {
+    // Naknade i provizije banke su uvijek rashodi
+    if (descLower.includes('naknada') || 
+        descLower.includes('provizija') ||
+        descLower.includes('troškovi')) {
+      console.log('→ Type: RASHOD (bank fee/commission)');
+      return 'rashod';
+    }
+    
+    // Primljene kamate su prihodi
+    if ((descLower.includes('kamata') || descLower.includes('kamate')) && 
+        (descLower.includes('isplat') || descLower.includes('virman') || descLower.includes('klijentu'))) {
+      console.log('→ Type: PRIHOD (interest received)');
+      return 'prihod';
+    }
+  }
+  
+  // ===================================================================
+  // PRIORITET 3: PLAĆANJA DRŽAVI/POREZIMA
+  // ===================================================================
+  
+  if (nameLower.includes('ministarstvo') ||
+      nameLower.includes('porezna') ||
+      nameLower.includes('republika hrvatska') ||
+      descLower.includes('uplata javnih davanja') ||
+      descLower.includes('porez') ||
+      descLower.includes('doprinos')) {
+    
+    // ALI - ako je opis "prijenos temeljnog kapitala" ili slično, to je prihod
+    if (descLower.includes('prijenos') || descLower.includes('temeljni')) {
+      console.log('→ Type: PRIHOD (transfer from government)');
+      return 'prihod';
+    }
+    
+    console.log('→ Type: RASHOD (tax/government payment)');
     return 'rashod';
   }
   
-  // Ako je iznos u desnoj polovici retka, možda je prihod
-  const amountIndex = line.indexOf(amount);
-  const lineLength = line.length;
-  if (amountIndex > lineLength / 2) {
+  // ===================================================================
+  // PRIORITET 4: KLJUČNE RIJEČI U OPISU
+  // ===================================================================
+  
+  // Rashodi - jasni znakovi plaćanja prema van
+  const strongExpenseKeywords = [
+    'naknada za', 'provizija', 'trošak', 'plaćanje računa',
+    'kupio', 'nabava', 'uplata doprinosa', 'uplata poreza'
+  ];
+  
+  // Prihodi - jasni znakovi primanja
+  const strongIncomeKeywords = [
+    'uplata avansa', 'uplata po', 'plaćanje fakture', 
+    'primljeno od', 'prihod od', 'naplata'
+  ];
+  
+  const hasStrongExpense = strongExpenseKeywords.some(kw => descLower.includes(kw));
+  const hasStrongIncome = strongIncomeKeywords.some(kw => descLower.includes(kw));
+  
+  if (hasStrongIncome) {
+    console.log('→ Type: PRIHOD (strong income keyword)');
     return 'prihod';
   }
   
-  // Default: rashod
-  return 'rashod';
+  if (hasStrongExpense) {
+    console.log('→ Type: RASHOD (strong expense keyword)');
+    return 'rashod';
+  }
+  
+  // ===================================================================
+  // PRIORITET 5: ANALIZA HR RAČUNA
+  // ===================================================================
+  
+  // Ako je HR račun tvoj = primio si novac = prihod
+  if (isOwnAccount) {
+    console.log('→ Type: PRIHOD (own account - money received)');
+    return 'prihod';
+  }
+  
+  // ===================================================================
+  // PRIORITET 6: HEURISTIKA NA OSNOVU IZNOSA
+  // ===================================================================
+  
+  // Veliki iznosi od klijenata su obično prihodi
+  if (amount > 100) {
+    console.log('→ Type: PRIHOD (amount > 100, likely client payment)');
+    return 'prihod';
+  }
+  
+  // Mali iznosi su obično rashodi (naknade, porezi)
+  if (amount < 50) {
+    console.log('→ Type: RASHOD (small amount < 50)');
+    return 'rashod';
+  }
+  
+  // ===================================================================
+  // PRIORITET 7: DEFAULT - PRIHOD (jer većina transakcija su primanja)
+  // ===================================================================
+  console.log('→ Type: PRIHOD (default - most transactions are income)');
+  return 'prihod';
 }
 
 // Formatiranje datuma u YYYY-MM-DD format
@@ -329,11 +395,6 @@ const parseAmount = (amountOrStr) => {
     return parseAmountString(amountOrStr);
   }
   return Math.abs(amountOrStr);
-};
-
-// Određivanje tipa transakcije
-const determineTransactionType = (amount) => {
-  return amount < 0 ? 'rashod' : 'prihod';
 };
 
 // Automatska kategorizacija transakcija

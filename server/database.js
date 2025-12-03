@@ -52,10 +52,33 @@ const createTables = () => {
         processed BOOLEAN DEFAULT 0
       )`,
       
+      // Tablica za putne naloge
+      `CREATE TABLE IF NOT EXISTS travel_orders (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        employee_name TEXT NOT NULL,
+        destination TEXT NOT NULL,
+        country TEXT DEFAULT 'Hrvatska',
+        departure_date TEXT NOT NULL,
+        return_date TEXT NOT NULL,
+        distance INTEGER DEFAULT 0,
+        round_trip_distance INTEGER DEFAULT 0,
+        duration_hours INTEGER DEFAULT 0,
+        duration_days INTEGER DEFAULT 0,
+        daily_allowance REAL DEFAULT 0,
+        travel_allowance REAL DEFAULT 0,
+        total_amount REAL DEFAULT 0,
+        accommodation BOOLEAN DEFAULT 0,
+        purpose TEXT,
+        notes TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )`,
+      
       // Indeksi za brže pretraživanje
       `CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions(date)`,
       `CREATE INDEX IF NOT EXISTS idx_transactions_type ON transactions(type)`,
-      `CREATE INDEX IF NOT EXISTS idx_transactions_category ON transactions(category)`
+      `CREATE INDEX IF NOT EXISTS idx_transactions_category ON transactions(category)`,
+      `CREATE INDEX IF NOT EXISTS idx_travel_orders_date ON travel_orders(departure_date)`
     ];
 
     let completed = 0;

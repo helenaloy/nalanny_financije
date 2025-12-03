@@ -137,6 +137,35 @@ router.delete('/:id', (req, res) => {
   });
 });
 
+// DELETE /api/transactions/year/:year - Obriši sve transakcije po godini
+router.delete('/year/:year', (req, res) => {
+  const year = parseInt(req.params.year);
+  
+  if (!year || year < 2000 || year > 2100) {
+    return res.status(400).json({ error: 'Nevaljana godina' });
+  }
+
+  const dbInstance = db.getDb();
+  const startDate = `${year}-01-01`;
+  const endDate = `${year}-12-31`;
+
+  dbInstance.run(
+    'DELETE FROM transactions WHERE date >= ? AND date <= ?',
+    [startDate, endDate],
+    function(err) {
+      if (err) {
+        console.error('Error deleting transactions by year:', err);
+        return res.status(500).json({ error: 'Greška pri brisanju transakcija' });
+      }
+      res.json({ 
+        message: `Uspješno obrisano ${this.changes} transakcija iz ${year}. godine`,
+        deletedCount: this.changes,
+        year: year
+      });
+    }
+  );
+});
+
 // GET /api/transactions/categories/list - Dohvati sve kategorije
 router.get('/categories/list', (req, res) => {
   const dbInstance = db.getDb();

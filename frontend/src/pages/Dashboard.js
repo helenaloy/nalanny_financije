@@ -118,7 +118,7 @@ const Dashboard = () => {
               minimumFractionDigits: 2,
               maximumFractionDigits: 2,
             })}{' '}
-            HRK
+            EUR
           </div>
         </div>
         <div className="stat-card">
@@ -128,7 +128,7 @@ const Dashboard = () => {
               minimumFractionDigits: 2,
               maximumFractionDigits: 2,
             })}{' '}
-            HRK
+            EUR
           </div>
         </div>
         <div className="stat-card">
@@ -140,7 +140,7 @@ const Dashboard = () => {
               minimumFractionDigits: 2,
               maximumFractionDigits: 2,
             })}{' '}
-            HRK
+            EUR
           </div>
         </div>
       </div>
@@ -197,14 +197,14 @@ const Dashboard = () => {
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2,
                     })}{' '}
-                    HRK
+                    EUR
                   </td>
                   <td className="stat-card-value negative">
                     {month.totalRashodi.toLocaleString('hr-HR', {
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2,
                     })}{' '}
-                    HRK
+                    EUR
                   </td>
                   <td
                     className={`stat-card-value ${
@@ -215,7 +215,7 @@ const Dashboard = () => {
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2,
                     })}{' '}
-                    HRK
+                    EUR
                   </td>
                 </tr>
               ))}
