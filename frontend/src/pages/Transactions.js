@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { format } from 'date-fns';
 import TransactionForm from '../components/TransactionForm';
@@ -20,12 +20,7 @@ const Transactions = () => {
   const [deleteYear, setDeleteYear] = useState(new Date().getFullYear());
   const [deleting, setDeleting] = useState(false);
 
-  useEffect(() => {
-    fetchCategories();
-    fetchTransactions();
-  }, [filters]);
-
-  const fetchTransactions = async () => {
+  const fetchTransactions = useCallback(async () => {
     try {
       setLoading(true);
       const params = new URLSearchParams();
@@ -42,16 +37,21 @@ const Transactions = () => {
       console.error('Error fetching transactions:', error);
       setLoading(false);
     }
-  };
+  }, [filters]);
 
-  const fetchCategories = async () => {
+  const fetchCategories = useCallback(async () => {
     try {
       const response = await axios.get('/api/transactions/categories/list');
       setCategories(response.data);
     } catch (error) {
       console.error('Error fetching categories:', error);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchCategories();
+    fetchTransactions();
+  }, [fetchCategories, fetchTransactions]);
 
   const handleDelete = async (id) => {
     if (window.confirm('Jeste li sigurni da želite obrisati ovu transakciju?')) {

@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
-import { format } from 'date-fns';
-import { Bar, Pie } from 'react-chartjs-2';
+import { Pie } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -25,17 +24,11 @@ ChartJS.register(
 
 const Reports = () => {
   const [yearlySummary, setYearlySummary] = useState([]);
-  const [monthlySummary, setMonthlySummary] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
   const [exportLoading, setExportLoading] = useState(false);
 
-  useEffect(() => {
-    fetchYearlySummary();
-    fetchMonthlySummary();
-  }, [selectedYear]);
-
-  const fetchYearlySummary = async () => {
+  const fetchYearlySummary = useCallback(async () => {
     try {
       const response = await axios.get('/api/reports/yearly');
       setYearlySummary(response.data);
@@ -44,16 +37,20 @@ const Reports = () => {
       console.error('Error fetching yearly summary:', error);
       setLoading(false);
     }
-  };
+  }, []);
 
-  const fetchMonthlySummary = async () => {
+  const fetchMonthlySummary = useCallback(async () => {
     try {
-      const response = await axios.get(`/api/reports/summary?year=${selectedYear}`);
-      setMonthlySummary(response.data);
+      await axios.get(`/api/reports/summary?year=${selectedYear}`);
     } catch (error) {
       console.error('Error fetching monthly summary:', error);
     }
-  };
+  }, [selectedYear]);
+
+  useEffect(() => {
+    fetchYearlySummary();
+    fetchMonthlySummary();
+  }, [fetchYearlySummary, fetchMonthlySummary]);
 
   const handleExport = async (format = 'excel') => {
     try {

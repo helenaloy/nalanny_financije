@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
-import { format, subMonths, startOfMonth, endOfMonth } from 'date-fns';
+import { format } from 'date-fns';
 import { Bar } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -27,12 +27,7 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
 
-  useEffect(() => {
-    fetchSummary();
-    fetchYearlySummary();
-  }, [selectedYear]);
-
-  const fetchSummary = async () => {
+  const fetchSummary = useCallback(async () => {
     try {
       const response = await axios.get(`/api/reports/summary?year=${selectedYear}`);
       setSummary(response.data);
@@ -41,16 +36,21 @@ const Dashboard = () => {
       console.error('Error fetching summary:', error);
       setLoading(false);
     }
-  };
+  }, [selectedYear]);
 
-  const fetchYearlySummary = async () => {
+  const fetchYearlySummary = useCallback(async () => {
     try {
       const response = await axios.get('/api/reports/yearly');
       setYearlySummary(response.data);
     } catch (error) {
       console.error('Error fetching yearly summary:', error);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchSummary();
+    fetchYearlySummary();
+  }, [fetchSummary, fetchYearlySummary]);
 
   // Izračunaj ukupne prihode i rashode za odabranu godinu
   const currentYearData = yearlySummary.find(y => y.year === selectedYear);
