@@ -11,7 +11,8 @@
     "chart.js": "^4.4.0",
     "react-chartjs-2": "^5.2.0",
     "date-fns": "^2.30.0",
-    "react-scripts": "5.0.1"
+    "react-scripts": "5.0.1",
+    "web-vitals": "^2.1.4"
   },
   "scripts": {
     "start": "react-scripts start",
@@ -20,7 +21,10 @@
     "eject": "react-scripts eject",
     "vercel-build": "react-scripts build"
   },
-  "devDependencies": {
+  "eslintConfig": {
+    "extends": [
+      "react-app"
+    ]
   },
   "browserslist": {
     "production": [
